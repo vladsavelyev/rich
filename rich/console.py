@@ -987,6 +987,7 @@ class Console:
             max_width=self.width,
             encoding=self.encoding,
             is_terminal=self.is_terminal,
+            no_wrap=True,
         )
 
     @property

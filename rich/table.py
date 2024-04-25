@@ -88,7 +88,7 @@ class Column:
     vertical: "VerticalAlignMethod" = "top"
     """str: How to vertically align content ("top", "middle", or "bottom")"""
 
-    overflow: "OverflowMethod" = "ellipsis"
+    overflow: Optional["OverflowMethod"] = None
     """str: Overflow method."""
 
     width: Optional[int] = None
@@ -103,7 +103,7 @@ class Column:
     ratio: Optional[int] = None
     """Optional[int]: Ratio to use when calculating column width, or ``None`` (default) to adapt to column contents."""
 
-    no_wrap: bool = False
+    no_wrap: Optional[bool] = None
     """bool: Prevent wrapping of text within the column. Defaults to ``False``."""
 
     _index: int = 0
@@ -369,12 +369,12 @@ class Table(JupyterMixin):
         style: Optional[StyleType] = None,
         justify: "JustifyMethod" = "left",
         vertical: "VerticalAlignMethod" = "top",
-        overflow: "OverflowMethod" = "ellipsis",
+        overflow: Optional["OverflowMethod"] = None,
         width: Optional[int] = None,
         min_width: Optional[int] = None,
         max_width: Optional[int] = None,
         ratio: Optional[int] = None,
-        no_wrap: bool = False,
+        no_wrap: Optional[bool] = None,
     ) -> None:
         """Add a column to the table.
 
@@ -547,9 +547,13 @@ class Table(JupyterMixin):
         table_width = sum(widths)
 
         if table_width > max_width:
+
+            def _no_wrap(col):
+                return col.no_wrap if col.no_wrap is not None else options.no_wrap
+
             widths = self._collapse_widths(
                 widths,
-                [(column.width is None and not column.no_wrap) for column in columns],
+                [(column.width is None and not _no_wrap(column)) for column in columns],
                 max_width,
             )
             table_width = sum(widths)
@@ -812,13 +816,21 @@ class Table(JupyterMixin):
                     get_row_style(console, index - 1 if show_header else index)
                 )
             for width, cell, column in zip(widths, row_cell, columns):
-                render_options = options.update(
-                    width=width,
-                    justify=column.justify,
-                    no_wrap=column.no_wrap,
-                    overflow=column.overflow,
-                    height=None,
-                )
+                render_options = options.copy()
+                render_options.width = width
+                render_options.height = None
+                render_options.justify = column.justify
+
+                if column.overflow is not None:
+                    render_options.overflow = column.overflow
+                if render_options.overflow is None:
+                    render_options.overflow = "ellipsis"
+
+                if column.no_wrap is not None:
+                    render_options.no_wrap = column.no_wrap
+                if render_options.no_wrap is None:
+                    render_options.no_wrap = False
+
                 lines = console.render_lines(
                     cell.renderable,
                     render_options,
